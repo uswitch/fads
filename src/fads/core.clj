@@ -1,21 +1,47 @@
 (ns fads.core
-  (:require [clj-facebook-graph.client :as fb]
-            [clj-facebook-graph.auth :as fba]))
+  (:require [clj-oauth2.client :as oauth]
+            [slingshot.slingshot :as sling]
+            [cemerick.url :refer (url url-encode)]
+            [clojure.reflect :as r]
+            [clojure.data.json :as json]
+            [clj-time.format :as tf]))
 
-(defn account-insights [account-id params]
-  (fb/get ["v2.4" (str "act_" account-id) "insights"]
-          {:query-params params}))
+(defn graph-url [access-token paths query-params]
+  (let [query (assoc query-params :access_token access-token)]
+    (assoc (apply url "https://graph.facebook.com/v2.4" paths) :query query)))
 
-(defn insights [token account-id]
-  (fba/with-facebook-auth {:access-token token}
-    (let [params {:level "adgroup"
-                  :date_preset "yesterday"
-                  :fields "adgroup_name,campaign_name,clicks,spend,impressions"}]
-      (loop [all      nil
-             response (account-insights account-id params)]
-        (let [{:keys [data paging]} (:body response)
-              after                 (get-in paging [:cursors :after])]
-          (if (nil? after)
-            all
-            (recur (concat all data)
-                   (account-insights account-id (assoc params :after after)))))))))
+(defn fetch [req]
+  (let [{:keys [body status] :as resp} (oauth/get (str req) {})]
+    (if (= 200 status)
+      (update-in resp
+                 [:body]
+                 #(json/read-str % :key-fn keyword))
+      resp)))
+
+(defn insights
+  "Retrieves adgroup level statistics, will follow pagination links to
+  return a sequence of all data."
+  [token account-id {:keys [since until after]}]
+  (let [query {:level          "adgroup"
+               :fields         "adgroup_name,campaign_name,clicks,spend,impressions"
+               :time_increment 1
+               :after          after
+               :time_range     (json/write-str {:since (tf/unparse (tf/formatters :date) since)
+                                                :until (tf/unparse (tf/formatters :date) until)})}
+        fetch-data (fn [query]
+                     (-> (graph-url token [(str "act_" account-id) "insights"] query) (fetch) :body))]
+    (loop [result   nil
+           response (fetch-data query)]
+      (let [{:keys [data paging]} response
+            after                 (get-in paging [:cursors :after])]
+        (if (nil? after)
+          (concat result data)
+          (recur (concat result data)
+                 (fetch-data (assoc query :after after))))))))
+
+(comment
+  (def token "OAUTH2_TOKEN")
+  (def account-id "ACCOUNT_ID")
+
+  (insights token account-id {:since (from-now (days -7))
+                              :until (today)}))
