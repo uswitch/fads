@@ -20,10 +20,11 @@
 
 (defn insights
   "Retrieves adgroup level statistics, will follow pagination links to
-  return a sequence of all data."
+  return a sequence of all data. Field names taken from:
+  https://developers.facebook.com/docs/marketing-api/insights/v2.4"
   [token account-id {:keys [since until after]}]
   (let [query {:level          "adgroup"
-               :fields         "adgroup_name,campaign_name,clicks,spend,impressions"
+               :fields         "adgroup_name,campaign_name,campaign_group_name,clicks,spend,impressions"
                :time_increment 1
                :after          after
                :time_range     (json/write-str {:since (tf/unparse (tf/formatters :date) since)
