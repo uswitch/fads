@@ -1,4 +1,4 @@
-(defproject fads "0.1.0-SNAPSHOT"
+(defproject fads "0.1.0"
   :description "Facebook Ads client"
   :url "https://github.com/uswitch/fads"
   :license {:name "Eclipse Public License"
