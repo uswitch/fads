@@ -4,7 +4,8 @@
             [cemerick.url :refer (url url-encode)]
             [clojure.reflect :as r]
             [clojure.data.json :as json]
-            [clj-time.format :as tf]))
+            [clj-time.format :as tf]
+            [clojure.string :as s]))
 
 (defn graph-url [access-token paths query-params]
   (let [query (assoc query-params :access_token access-token)]
@@ -22,13 +23,14 @@
   "Retrieves adgroup level statistics, will follow pagination links to
   return a sequence of all data. Field names taken from:
   https://developers.facebook.com/docs/marketing-api/insights/v2.4"
-  [token account-id {:keys [since until after]}]
-  (let [query {:level          "adgroup"
-               :fields         "adgroup_name,campaign_name,campaign_group_name,clicks,spend,impressions"
-               :time_increment 1
-               :after          after
-               :time_range     (json/write-str {:since (tf/unparse (tf/formatters :date) since)
-                                                :until (tf/unparse (tf/formatters :date) until)})}
+  [token account-id {:keys [since until after level fields]
+                     :or   {level "adgroup"
+                            fields ["adgroup_name" "campaign_name" "campaign_group_name" "clicks" "spend" "impressions"]}}]
+  (let [base-query {:time_increment 1
+                    :after          after
+                    :time_range     (json/write-str {:since (tf/unparse (tf/formatters :date) since)
+                                                     :until (tf/unparse (tf/formatters :date) until)})}
+        query      (assoc base-query :level level :fields (s/join "," fields))
         fetch-data (fn [query]
                      (-> (graph-url token [(str "act_" account-id) "insights"] query) (fetch) :body))]
     (loop [result   nil
