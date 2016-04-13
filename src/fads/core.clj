@@ -8,8 +8,9 @@
             [clojure.string :as s]))
 
 (defn graph-url [access-token paths query-params]
-  (let [query (assoc query-params :access_token access-token)]
-    (assoc (apply url "https://graph.facebook.com/v2.4" paths) :query query)))
+  (let [query (assoc query-params :access_token access-token)
+        url   (assoc (apply url "https://graph.facebook.com/v2.5" paths) :query query)]
+    url))
 
 (defn fetch [req]
   (let [{:keys [body status] :as resp} (oauth/get (str req) {})]
@@ -22,10 +23,10 @@
 (defn insights
   "Retrieves adgroup level statistics, will follow pagination links to
   return a sequence of all data. Field names taken from:
-  https://developers.facebook.com/docs/marketing-api/insights/v2.4"
+  https://developers.facebook.com/docs/marketing-api/insights/v2.5"
   [token account-id {:keys [since until after level fields]
                      :or   {level "adgroup"
-                            fields ["adgroup_name" "campaign_name" "campaign_group_name" "clicks" "spend" "impressions"]}}]
+                            fields ["adgroup_name" "campaign_name" "campaign_id" "clicks" "spend" "impressions"]}}]
   (let [base-query {:time_increment 1
                     :after          after
                     :time_range     (json/write-str {:since (tf/unparse (tf/formatters :date) since)
