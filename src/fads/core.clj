@@ -7,9 +7,9 @@
             [clj-time.format :as tf]
             [clojure.string :as s]))
 
-(defn graph-url [access-token paths query-params]
+(defn graph-url [endpoint access-token paths query-params]
   (let [query (assoc query-params :access_token access-token)
-        url   (assoc (apply url "https://graph.facebook.com/v2.5" paths) :query query)]
+        url   (assoc (apply url endpoint paths) :query query)]
     url))
 
 (defn fetch [req]
@@ -24,16 +24,17 @@
   "Retrieves adgroup level statistics, will follow pagination links to
   return a sequence of all data. Field names taken from:
   https://developers.facebook.com/docs/marketing-api/insights/v2.5"
-  [token account-id {:keys [since until after level fields]
-                     :or   {level "adgroup"
-                            fields ["adgroup_name" "campaign_name" "campaign_id" "clicks" "spend" "impressions"]}}]
+  [token account-id {:keys [since until after level fields endpoint]
+                     :or   {endpoint "https://graph.facebook.com/v2.6"
+                            level    "adgroup"
+                            fields   ["adgroup_name" "campaign_name" "campaign_id" "clicks" "spend" "impressions"]}}]
   (let [base-query {:time_increment 1
                     :after          after
                     :time_range     (json/write-str {:since (tf/unparse (tf/formatters :date) since)
                                                      :until (tf/unparse (tf/formatters :date) until)})}
         query      (assoc base-query :level level :fields (s/join "," fields))
         fetch-data (fn [query]
-                     (-> (graph-url token [(str "act_" account-id) "insights"] query) (fetch) :body))]
+                     (-> (graph-url endpoint token [(str "act_" account-id) "insights"] query) (fetch) :body))]
     (loop [result   nil
            response (fetch-data query)]
       (let [{:keys [data paging]} response
